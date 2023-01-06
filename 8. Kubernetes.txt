@@ -1,0 +1,297 @@
+Kubernetes
+============
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Kubernetes Components
+======================
+
+Master Node
+===============
+1. Api Server
+2. Controller
+3. ETCD
+4. Scheduler
+
+Worker Node
+============
+1. Kubelet
+2. Kube Proxy
+3. Container RunTime
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Kubernetes Service
+==================
+1. Cluster IP
+2. Headless Service - helpful Stateful application where 1 pod wants to connect with another pod for data synchoronization. just pass ClusterIp as None in service.yaml file
+3. NodePort
+4. Loadbalancer for external/internal
+5. Ingress for external
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Kubernetes Operator
+====================
+K8s Operator is used mainly for stateful application.
+
+Stateless Application - Those Application which doesn't required any type of stateness like frontend/backend, Here we didn't required to control after application deployed.
+Due to Deployment Component, If any pod dies it will regenrate it again.
+
+Stateful Application - Those Application which required stateness while and after deploying the application like databases. Here we need to setup PV/PVC for data persistent,
+need to check if any pod dies it will generate again with stateness. It required manual intervenetion but itn't a good process.
+
+To remove this manual intervenetion K8s Operator come in existence -
+
+Stateful With Operator => Using Operator, We replace the human Operator with software Operator which will take care of the application. So, The all manual task which is required
+for stateful application done by devops engineer is packed to a program which has the knowledge how to deploy the application, creating cluster etc. Task is automated.
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Secure Your Cluster - Authorization with RBAC
+===============================================
+- How Authorization and Authentication works in Kubernetes.
+- How to configure users, groups and their permission.
+- Authorization with ROLE BASED ACCESS CONTROL (RBAC).
+
+HOW RBAC WORKS FOR NAMESPACES (MULTIPLE NAMESPACES IN A CLUSTER) -
+===================================================================
+It is useful for the K8s Developer Team.
+
+ROLE COMPONENT - It basically use for defining Resources and Access Permission. No Information on WHO gets these Permission.
+- With Role Component you can define namespaced permission.
+- It will bound to the specific Namespace.
+- You can Define what resources in the namsepace user can access.
+- You can define action (list, get, update, delete) on the Resource you choose above. 
+
+ROLE-BINDING COMPONENT - It is useful to bind the above role component to a user or the team/group so, all members of group or a single user get 
+permission defined in the Role Component.
+
+HOW RBAC WORKS FOR CLUSTER -
+================================
+It is useful for the K8s Administrators.
+
+CLUSTER-ROLE COMPONENT - It basically use for defining the resource and permission cluster wide to the kubernetes-adminstrator which can 'manageing namespace in a cluster',
+'configuring cluster-wide volumes'.
+
+CLUSTER-ROLE-BINDING - To bind the cluster-role to the kubernetes-adminstrator.
+
+USERS AND GROUPS CREATION IN K8s -
+==========================================
+- Kubernetes doen't manage users natively.
+- Admins can choose diff authentication stretegies.
+- No K8s Objects exist for representing normal user accounts.
+
+External Sources For Authentication
+------------------------------------
+1. static token file
+2. certificates
+3. 3rd party identity service 
+
+- API SERVER handles authentication of all the requests.
+- API SERVER uses one of these configured authentication methods. 
+example - kube-apiserver --token-auth-file=/users.csv [other options]
+/users.csv file contains - token, userName, userID
+
+Authentication/Authorization of Human Users -
+===============================================
+=> Admins: Access to whole cluster through ClusterRole
+=> Developer: Access a Namespace through Role
+
+Authentication/Authorization of Application Users -
+=====================================================
+Example Internal Application -
+-------------------------------
+- Application Users like monitoring apps, which collects metrics from other apps within cluster.
+- Microservices needing access only within their namespaces.
+Example External Application -
+--------------------------------
+- CICD server deloying apps inside the cluster.
+- Terraform configuring the cluster.
+
+=> SERVICE-ACCOUNT Resource - Its a kubernetes component that represents An Application User and Then you can link/bind this to Role or Cluster Role.
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+----------------- Role Configuration File -------------------
+This Role has the permisssion of pods and secrets in default namsepace
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+    name: developer
+    namespace: default
+rules:
+  - apiGroups: [""]  
+    resources: ["pods"]
+    verbs: ["get", "create", "list"]
+    resourceName: ["mydb"] --------------> Only mydb pod permission is given. resourceName is used to provide specific resource permission.
+  - apiGroups: [""]  
+    resources: ["secrets"]
+    verbs: ["get"]  
+
+-------------------- Role Binding Configuration ------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+    name: java-developer-binding
+subjects:
+  - kind: User/Group/ServiceAccount
+    name: nirdesh
+    apiGroup: rbac.authorization.k8s.io/v1
+roleRef:
+    kind: Role
+    name: developer
+    apiGroup: rbac.authorization.k8s.io/v1
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+----------------- ClusterRole Configuration File -------------------
+This Role has the permisssion of pods and secrets in default namsepace
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+    name: cluster-admin
+rules:
+  - apiGroups: [""]  
+    resources: ["nodes"]/["namsepace"]/["pods","Deployment","secrets"] -------> These all comes under a cluster so we can also give permission individually.
+    verbs: ["get", "create", "list", "update"]
+    resourceName: ["mydb"] --------------> Only mydb pod permission is given. resourceName is used to provide specific resource permission.
+
+-------------------- ClusterRole Binding Configuration ------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+    name: read-secrets-global
+subjects:
+  - kind: User/Group/ServiceAccount
+    name: nirdesh/admins/jenkins
+    apiGroup: rbac.authorization.k8s.io/v1
+roleRef:
+    kind: ClusterRole
+    name: cluster-admin
+    apiGroup: rbac.authorization.k8s.io/v1
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+------------- Checking API Access ---------------------------------
+
+kubectl provide a "auth can-i" subcommand which can help in quickly check if current user can perform a given action.
+like - kubect auth can-i create deployments --namsepace dev
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+------------------------- Creating EKS Cluster on AWS ------------------------------
+= Creating Eks Cluster
+
+1. Create IAM Role For EKS Cluster.
+2. Create VPC and Private and Public Subnet using CFN - "https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+3. Create EKS Cluster Using the above VPC, SUBNET, SECURITY GROUPS.
+4. Configuring local for AWS EKS Cluster using command "aws eks update-kubeconfig --name eks-cluster".
+
+= Creating Node Group
+
+5. Create a Node Group Iam Role for attaching worker nodes to eks cluster.- "AmazonEKS_CNI_Policy, AmazonEKSWorkerNodePolicy, AmazonEC2ContainerRegistryReadOnly"
+6. Create a Node Group and provide the required nodes and details required to it.
+7. Now, You can check nodes on local using "Kubectl get nodes".
+
+Configure Auto Scale to Node Group 
+
+8. Check Your Node Group Configuration, Go to Auto Scaling Group using node group.
+9. Create IAM Custom Policy and attach to Node Group IAM Role.
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Resource": "*",
+            "Action": [
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeTags",
+                "autoscaling:DescribeLaunchConfigurations",
+                "autoscaling:SetDesiredCapacity",
+                "autoscaling:TerminateInstanceInAutoScalingGroup",
+                "ec2:DescribeLaunchTemplateVersions"
+            ]
+        }
+    ]
+}
+10. Deploy autoscaler component from local "kubectl apply - f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml"
+11. Edit some annotations and command changes inside the deployment "cluster-autoscaler" under the namespace "kube-system"
+12. And Apply again. For More follow this docs "https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html#cluster-autoscaler"
+
+= Creating Fargate with EKS
+1. Create an IAM Role for fargate with EKS => EKS Fargate Pod.
+2. Choose Your EKS Cluster, and Add Fargate.
+3. Provide Details to fargate like name, role, subnet, namespace and labels.\
+4. Create a deployment configuration file and add namespace=dev, selector as profile = fargate .
+5. Apply the configuration file and you will see that a fargate node is created when you run command "kubectl get nodes"
+
+= You Can also create the cluster with "eksctl" For more follow "https://github.com/weaveworks/eksctl#installation"
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Deploy Artifect to EKS through Jenkins Pipeline
+==================================================
+Workflow-
+1. Install Kubectl inside Jenkins Server - 
+2. Install AWS-IAM-Authenticator tool inside Jenkins Server.
+3. Create KubeCofig file to connect EKS Cluster - It will contains all the necessary info for authentication. "https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html"
+```
+Create a file "config"
+here is data -
+
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://25BD0CC02768B5906821CA9525C4BDF1.gr7.us-east-1.eks.amazonaws.com
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvakNDQWVhZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJek1ERXdOREUxTVRZd00xb1hEVE16TURFd01URTFNVFl3TTFvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBS3NwCnZhYXhTOXRFUnBwbGdTeVJkYkdzazBweHREdGdhSjVwUWw1T1VlRGZZQmZpWmNJekhLWEkyQ0dBcXZtakNyRFcKUzlSRlhFZVp4Um9Od2lycHY0c3kvSlJBa25SWnFkcTJlN0daRWlwcDJINFprYjM3R1c0dzlmVUtZZ1Z1Y2dVMAoyUTJKOFhCeWRHaTNQMGdMdGgxUlMyY2RXb2ZHVzdTMkVid3YrMUN4dlcyKy82OVhhMGU4bmhMRHBSNEtzcU5qCkFja2tybzRyWlJFWmhRUUQrQzFkOHRpUzYrcWlRWFJVeHRnNElkZmpPV01zMHVNVU9lYjZVN0JDZkM5REhtdDUKTVhBNW9Cd2dsWkxNN2pHRDR6cHI5TG1CZ3RGMzd2N1ZLdWh3MU5pN0djZXYycDBMWnNmVVpDS2ZZdXU0Z1huMgpOWTJiZFkybWJZUzdLUkhjNHdVQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZJVElCZWdkR1BCbmxRbWZ4bHMwempsNG5zZC9NQlVHQTFVZEVRUU8KTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBQjVWN2hpT0lRbExrdzBOQis0dwo5dGVqaUdJR3pUK2xsRGRQUytIU1ZodjBDZlR1RE44YXFXckcvNnNwTmJPZXB5ZmM5cTRZcnBjZ2pSWTdhcHhHCk1FQjN0YmFjRSszM3IydVBJK1gyeUVsNmxydGRTMHIyR1lOOU5DRllaeCtXMmhWWkJ4QXUwU3lOOTZqY0cwNGkKeTJVS0FJSGMvWFdqbS9xZE5aVjk0bzZMYWRnaFFBUUs5aHpWOU5SR0Z2MXhTOHpJcXU3am9JVEtxSHlVaFRXKwp3cEFhYjRrd05lcTFqUGZlUTZrc2MwNS9pcnc5UjhnTkVUdzVCY2VzN08yUFVHeXZrZU4zL1Z2U1RSYTlEc3ByCis1bEVoWWtjbmFpVjhvM09FUG9Paml2dGpYUEQ1dkV2ZW83VHVseTVacjdkcDRIcEsrcVpKT1NzK3VPRTBwdzAKV0NJPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  name: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+    user: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+  name: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+current-context: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-1:626170306581:cluster/eks-cluster
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: aws-iam-authenticator
+      args:
+        - "token"
+        - "-i"
+        - "eks-cluster"
+```
+copy this file to jenkins server - 
+  - Go To Jenkins Server.
+  - Now Copy config file to /var/jenkins_home using "docker cp config <container id>:/var/jenkins_home/.kube"
+4. Add AWS Creds on Jenkins for AWS Account Authentication.
+  ```
+  Create a IAM User as Jenkins with limited policy.
+  Download Jenkins AWS User Creds.
+  Create Global Creds inside Jenkins UI. Dashboard -> Manage Server -> Manage Creds -> Global as Secret Text
+  ```
+5. Adjust Jenkinsfile to configure EKS cluster deployment.
+  ```
+  Under Deploy Stage
+   - environment {
+    AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key')
+    AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
+   }
+   - Script {
+    echo "deploying docker image"
+    sh 'kubectl create deployment nginx-deployment --image=nginx'
+  }
+  ```
+
+
+
